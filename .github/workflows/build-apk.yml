@@ -1,0 +1,56 @@
+name: Construire l'APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Copier l'interface dans l'app Android
+        run: |
+          mkdir -p android/app/src/main/assets/www
+          cp web/index.html android/app/src/main/assets/www/
+          cp -r web/icons android/app/src/main/assets/www/
+
+      - name: Télécharger le modèle vocal français (Vosk)
+        run: |
+          curl -fL --retry 3 -o android/app/src/main/assets/vosk-model-small-fr.zip \
+            https://alphacephei.com/vosk/models/vosk-model-small-fr-0.22.zip
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Compiler
+        working-directory: android
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Nommer l'APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk Safeword.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Safeword-apk
+          path: Safeword.apk
+
+      - name: Publier un lien de téléchargement direct
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: derniere-version
+          name: Dernière version
+          body: Télécharge Safeword.apk ci-dessous et installe-le sur ton téléphone Android.
+          prerelease: true
+          files: Safeword.apk
